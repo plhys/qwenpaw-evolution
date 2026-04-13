@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-QwenPaw Evolution Plugin (v7.1.8)
-Windows Quoting Safeguard & Dependency Pre-flight Check
+QwenPaw Evolution Plugin (v7.2.0)
+[Native Mode] - No MCP subprocess, No agent.json pollution.
 """
 
 import json
@@ -14,9 +14,15 @@ from pathlib import Path
 from qwenpaw.plugins.api import PluginApi
 from .lib.env_adapter import EnvAdapter
 from .lib.bootstrap import BootstrapManager
-from .lib.console_server import ConsoleServer
-from .engine.brain import EvolutionBrain
-from .engine.messenger import Messenger
+# Native tool logic imported directly
+from .lib.skill_manager import (
+    create_skill,
+    run_dream_cycle,
+    list_skills,
+    approve_skill,
+    get_evolution_timeline,
+    archive_skill,
+)
 
 logger = logging.getLogger("qwenpaw.plugin.dream_engine")
 
@@ -25,24 +31,56 @@ class DreamEvolutionPlugin:
         try:
             BootstrapManager.initialize()
         except: pass
-        self.brain = EvolutionBrain()
-        self.messenger = Messenger()
-        self.console = ConsoleServer(port=8080)
 
     def register(self, api: PluginApi):
+        # 1. Startup hook for filesystem maintenance and cleanup
         api.register_startup_hook(hook_name="dream_engine_init", callback=self.on_startup, priority=200)
+        
+        # 2. Register tools NATIVELY (Direct Python calls, No MCP overhead)
+        # QwenPaw Plugin API supports register_tool for direct tool injection
+        api.register_tool(
+            name="evolve_create_skill",
+            func=self._native_create_skill,
+            desc="Create a new QwenPaw skill. Requires python code and test snippet."
+        )
+        api.register_tool(
+            name="evolve_run_dream_cycle",
+            func=self._native_run_dream_cycle,
+            desc="Trigger the backend dream cycle logic to organize memory."
+        )
+        api.register_tool(
+            name="evolve_approve_skill",
+            func=self._native_approve_skill,
+            desc="Approve a skill from 'Draft' to 'Active' status."
+        )
+        api.register_tool(
+            name="evolve_list_skills",
+            func=self._native_list_skills,
+            desc="List all managed skills."
+        )
+        api.register_tool(
+            name="evolve_get_timeline",
+            func=self._native_get_timeline,
+            desc="Retrieve the evolution timeline and soul growth snapshots."
+        )
+        api.register_tool(
+            name="evolve_archive_skill",
+            func=self._native_archive_skill,
+            desc="Remove or archive a skill."
+        )
+        api.register_tool(
+            name="evolve_self_destruct",
+            func=self._native_self_destruct,
+            desc="[CRITICAL] Cleanup all plugin artifacts and prepare for uninstallation."
+        )
 
     async def on_startup(self):
-        logger.info("🚀 QwenPaw Evolution v7.1.9 启动 (Deep Cleanup Support)")
-        self._bootstrap_all_workspaces()
-        try:
-            self.console.start()
-        except: pass
-        self.load_evolved_skills_into_memory()
+        logger.info("🚀 QwenPaw Evolution v7.2.0 启动 [Native Mode]")
+        self._bootstrap_and_cleanup()
 
-    def _bootstrap_all_workspaces(self):
+    def _bootstrap_and_cleanup(self):
+        """Maintains skills dir and CLEANS legacy agent.json MCP config."""
         plugin_root = Path(__file__).parent
-        # 探测所有潜在的根目录
         homes = [EnvAdapter.get_base_dir(), Path.home() / ".qwenpaw"]
         targets = []
         for h in homes:
@@ -54,8 +92,7 @@ class DreamEvolutionPlugin:
         unique_targets = list(set([t.resolve() for t in targets if t.exists()]))
         
         for workspace_dir in unique_targets:
-            agent_json = workspace_dir / "agent.json"
-            # 同步技能文件
+            # 1. Sync bundled skills
             try:
                 dest = workspace_dir / "skills"
                 dest.mkdir(parents=True, exist_ok=True)
@@ -65,38 +102,56 @@ class DreamEvolutionPlugin:
                         shutil.copytree(s, dest / s.name)
             except: pass
 
+            # 2. CLEAN Legacy MCP Config (Crucial for stability)
+            agent_json = workspace_dir / "agent.json"
             if agent_json.exists():
                 try:
-                    # 使用 utf-8-sig 处理 Windows 特有的 BOM 标记
                     with open(agent_json, "r", encoding="utf-8-sig") as f:
                         data = json.load(f)
                     
-                    m_key = "mcp" if "mcp" in data else "mcp_servers"
-                    if m_key not in data: data[m_key] = {"clients": {}}
-                    if "clients" not in data[m_key]: data[m_key]["clients"] = {}
+                    modified = False
+                    for m_key in ["mcp", "mcp_servers"]:
+                        if m_key in data:
+                            for sub in ["clients", "servers"]:
+                                if sub in data[m_key] and "evolution_engine" in data[m_key][sub]:
+                                    del data[m_key][sub]["evolution_engine"]
+                                    modified = True
                     
-                    # 🚀 v7.1.9 加固：Windows 下使用绝对路径，并确保 command 能够被系统识别
-                    python_exe = sys.executable
-                    mcp_server_path = (plugin_root / "mcp_server.py").resolve().as_posix()
-                    
-                    data[m_key]["clients"]["evolution_engine"] = {
-                        "name": "Dream Engine Evolution",
-                        "enabled": True,
-                        "transport": "stdio",
-                        "command": python_exe, 
-                        "args": [mcp_server_path],
-                        "env": {"QWENPAW_WORKING_DIR": workspace_dir.as_posix()},
-                        "cwd": plugin_root.as_posix()
-                    }
-                    
-                    # 写入时强制不带 BOM，防止 QwenPaw 核心解析器报错
-                    with open(agent_json, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=2, ensure_ascii=False)
-                    logger.info(f"🔥 [配置已加固] -> {agent_json}")
-                except Exception as e:
-                    logger.error(f"❌ 注入失败 {agent_json}: {e}")
+                    if modified:
+                        with open(agent_json, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=2, ensure_ascii=False)
+                        logger.info(f"🧹 Legacy MCP config removed from {agent_json}")
+                except: pass
 
-    def load_evolved_skills_into_memory(self):
-        pass
+    # --- Native Tool Implementation Proxies ---
+
+    def _native_create_skill(self, name: str, description: str, content: str, 
+                             test_code: str = "", reason: str = "Task Driven") -> str:
+        return json.dumps(create_skill(name, description, content, test_code, reason))
+
+    def _native_run_dream_cycle(self) -> str:
+        return json.dumps(run_dream_cycle())
+
+    def _native_approve_skill(self, name: str) -> str:
+        return json.dumps(approve_skill(name))
+
+    def _native_list_skills(self) -> str:
+        return json.dumps(list_skills())
+
+    def _native_get_timeline(self) -> str:
+        return json.dumps(get_evolution_timeline())
+
+    def _native_archive_skill(self, name: str) -> str:
+        return json.dumps(archive_skill(name))
+
+    def _native_self_destruct(self) -> str:
+        """Runs the uninstaller script."""
+        import subprocess
+        script_path = os.path.join(os.path.dirname(__file__), "uninstall.py")
+        try:
+            subprocess.run([sys.executable, script_path], check=True)
+            return "✅ Self-destruct completed. Please restart QwenPaw."
+        except Exception as e:
+            return f"❌ Cleanup failed: {e}"
 
 plugin = DreamEvolutionPlugin()
