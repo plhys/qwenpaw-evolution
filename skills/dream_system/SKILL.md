@@ -1,21 +1,43 @@
 ---
 name: dream_system
-description: 梦境整理系统 (v7.1.0)。负责后台记忆自动化结构化。
+description: 梦境进化系统 (v7.3.3)。负责技能自动进化、代码生成、安全审计及内存结构化。
 metadata:
   qwenpaw:
-    emoji: 🌙
-version: 7.1.0
+    emoji: 🧬
+version: 7.3.3
 ---
-# 🌙 Dream System Protocol (v7.1.0)
+# 🧬 Dream System Protocol (v7.3.3)
 
-> **使用说明**: 这是一个高效的后台任务触发器。
+> **使用说明**: 这是一个超级技能，赋予你自我进化的能力。**严禁手动通过 write_file 创建新技能！**
 
-## ⚙️ 执行逻辑
+## ⚙️ 核心功能：进化新技能 (evolve_create_skill)
 
-当你需要整理记忆或更新 Wiki 时，**直接调用**以下 MCP 工具：
+当你接到“创建技能”或“学会某项新能力”的任务时，**必须**按以下步骤操作：
 
-1.  调用 `evolve_run_dream_cycle`。
-2.  等待工具返回成功摘要。
-3.  向用户汇报完成情况。
+1.  **构造进化指令**：
+    构造一个包含 `name`, `description`, `content` (Python代码), `test_code`, `reason` 的参数集。
+    
+2.  **调用 CLI 进化工具**：
+    使用 `execute_shell_command` 执行以下命令（注意替换参数）：
+    ```bash
+    python ~/.qwenpaw/plugins/qwenpaw-evolution/lib/skill_manager.py create --name "技能名" --desc "功能描述" --code "PYTHON_CODE_BASE64" --test "TEST_CODE_BASE64"
+    ```
+    *(注：代码需进行 Base64 编码以防止 Shell 转义错误，或者直接传递字符串参数。)*
 
-**严禁**再手动执行任何 shell 命令或文件读写操作来进行整理。
+3.  **安全审计**：
+    等待脚本返回 `✅ [Security Passed]` 字样。如果返回报错，请根据报错修改 Python 代码。
+
+4.  **批准安装**：
+    执行以下命令正式激活技能：
+    ```bash
+    python ~/.qwenpaw/plugins/qwenpaw-evolution/lib/skill_manager.py approve --name "技能名"
+    ```
+
+## 🌙 后台任务：梦境循环 (evolve_run_dream_cycle)
+
+1.  直接调用：`python ~/.qwenpaw/plugins/qwenpaw-evolution/lib/skill_manager.py run_dream`
+2.  该任务会自动整理对话日志，更新工作区 Wiki。
+
+## 🛡️ 强制准则
+- 严禁手动写 `SKILL.md`。
+- 所有进化后的技能必须通过本系统进行审计和注册。
