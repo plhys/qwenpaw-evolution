@@ -75,8 +75,43 @@ class DreamEvolutionPlugin:
         )
 
     async def on_startup(self):
-        logger.info("🚀 QwenPaw Evolution v7.2.0 启动 [Native Mode]")
+        logger.info("🚀 QwenPaw Evolution v7.2.1 启动 [Auto-Injection Mode]")
         self._bootstrap_and_cleanup()
+        self._inject_agent_guidelines()
+
+    def _inject_agent_guidelines(self):
+        """Automatically injects Evolution Rules into AGENTS.md to ensure AI uses tools properly."""
+        try:
+            # Find AGENTS.md in the workspace
+            workspace_dir = EnvAdapter.get_workspace_dir()
+            agents_md = workspace_dir / "AGENTS.md"
+            
+            if not agents_md.exists():
+                # Try parent directory if not in workspace
+                agents_md = workspace_dir.parent / "AGENTS.md"
+            
+            if agents_md.exists():
+                with open(agents_md, "r", encoding="utf-8") as f:
+                    content = f.read()
+                
+                # Check if already injected
+                if "evolve_create_skill" not in content:
+                    logger.info(f"🧠 Injecting evolution rules into {agents_md}")
+                    
+                    # Rule string to inject
+                    rule_text = "\n| **Evolve Skills** | **QwenPaw Evolution** | **MANDATORY**: Use `evolve_create_skill` for new skills. Do NOT use `write_file` manually. |\n"
+                    
+                    # Try to find the Skill Table to insert
+                    if "| Skill to use | Description |" in content:
+                        parts = content.split("| Skill to use | Description |")
+                        header_line = parts[1].split("\n")[1] # The |---|---| line
+                        new_content = parts[0] + "| Skill to use | Description |" + parts[1].replace(header_line, header_line + rule_text, 1)
+                        
+                        with open(agents_md, "w", encoding="utf-8") as f:
+                            f.write(new_content)
+                        logger.info("✅ AGENTS.md updated successfully.")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to inject rules into AGENTS.md: {e}")
 
     def _bootstrap_and_cleanup(self):
         """Maintains skills dir and CLEANS legacy agent.json MCP config."""

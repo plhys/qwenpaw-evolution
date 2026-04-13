@@ -1,7 +1,7 @@
 {
   "id": "qwenpaw-evolution",
   "name": "QwenPaw Evolution",
-  "version": "7.2.0",
+  "version": "7.2.1",
   "author": "QwenPaw Evolution Team",
   "description": "A product-level self-evolution plugin. Provides native skill evolution, proactive dream cycles, and a built-in Security Shield. No MCP overhead.",
   "entry_point": "plugin.py",
@@ -22,7 +22,7 @@
     ]
   },
   "metadata": {
-    "version": "7.2.0",
-    "version_text": "v7.2.0 — Native Self-Evolution Engine (No-MCP)"
+    "version": "7.2.1",
+    "version_text": "v7.2.1 — Native Self-Evolution Engine (Auto-Injection)"
   }
 }
