@@ -71,6 +71,26 @@ def evolve_archive_skill(name: str) -> str:
     result = archive_skill(name)
     return json.dumps(result)
 
+import subprocess
+
+@mcp.tool()
+def evolve_self_destruct() -> str:
+    """
+    [CRITICAL] Complete cleanup and preparation for uninstallation.
+    Cleans agent.json, skill.json, and workspace artifacts.
+    After running this, you can safely remove the plugin directory.
+    """
+    try:
+        script_path = os.path.join(os.path.dirname(__file__), "uninstall.py")
+        result = subprocess.run([sys.executable, script_path], 
+                                capture_output=True, text=True)
+        if result.returncode == 0:
+            return "✅ Self-destruct cleanup finished successfully. You can now safely delete the plugin folder and restart QwenPaw."
+        else:
+            return f"❌ Cleanup failed: {result.stderr}"
+    except Exception as e:
+        return f"❌ Execution error: {e}"
+
 if __name__ == "__main__":
     # Ensure no other output goes to stdout (which is used for MCP)
     # But do NOT redirect sys.stdout globally before mcp.run() as it might break the transport.

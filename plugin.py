@@ -33,7 +33,7 @@ class DreamEvolutionPlugin:
         api.register_startup_hook(hook_name="dream_engine_init", callback=self.on_startup, priority=200)
 
     async def on_startup(self):
-        logger.info("🚀 QwenPaw Evolution v7.1.8 启动 (Windows 路径增强版)")
+        logger.info("🚀 QwenPaw Evolution v7.1.9 启动 (Deep Cleanup Support)")
         self._bootstrap_all_workspaces()
         try:
             self.console.start()
